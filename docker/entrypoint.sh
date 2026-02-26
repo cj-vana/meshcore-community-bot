@@ -97,6 +97,7 @@ apply_config_override "Discord" "emergency_broadcast_channel" "${DISCORD_EMERGEN
 
 # Coordinator settings
 apply_config_override "Coordinator" "url" "${COORDINATOR_URL}"
+apply_config_override "Coordinator" "registration_key" "${COORDINATOR_REGISTRATION_KEY}"
 apply_config_override "Coordinator" "mesh_region" "${MESH_REGION}"
 
 # ============================================

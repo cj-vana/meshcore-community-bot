@@ -14,9 +14,10 @@ logger = logging.getLogger(__name__)
 class CoordinatorClient:
     """Client for communicating with the central MeshCore Coordinator."""
 
-    def __init__(self, base_url: str, timeout_ms: int = 100, data_dir: str = "data"):
+    def __init__(self, base_url: str, timeout_ms: int = 100, data_dir: str = "data", registration_key: str = ""):
         self.base_url = base_url.rstrip("/")
         self.timeout_ms = timeout_ms
+        self.registration_key = registration_key
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -100,6 +101,7 @@ class CoordinatorClient:
             "capabilities": capabilities or [],
             "version": version,
             "mesh_region": mesh_region,
+            "registration_key": self.registration_key,
         }
         if latitude is not None and longitude is not None:
             payload["location"] = {

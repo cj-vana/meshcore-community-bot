@@ -48,6 +48,7 @@ class CommunityBot(MeshCoreBot):
             base_url=self.coordinator_config.url,
             timeout_ms=self.coordinator_config.coordination_timeout_ms,
             data_dir=str(self.bot_root / "data"),
+            registration_key=self.coordinator_config.registration_key,
         )
 
         # Initialize fallback

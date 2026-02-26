@@ -9,6 +9,7 @@ class CoordinatorConfig:
     """Configuration for coordinator connectivity."""
 
     url: str = ""
+    registration_key: str = ""
     bot_token: str = ""
     heartbeat_interval: int = 30
     coordination_timeout_ms: int = 500
@@ -23,6 +24,10 @@ class CoordinatorConfig:
             url=os.environ.get(
                 "COORDINATOR_URL",
                 config.get("Coordinator", "url", fallback=""),
+            ),
+            registration_key=os.environ.get(
+                "COORDINATOR_REGISTRATION_KEY",
+                config.get("Coordinator", "registration_key", fallback=""),
             ),
             bot_token="",  # Loaded from file at runtime
             heartbeat_interval=int(
