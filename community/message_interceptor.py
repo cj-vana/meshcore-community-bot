@@ -32,7 +32,7 @@ class MessageInterceptor:
 
         logger.info("Message interceptor installed on CommandManager.send_response")
 
-    async def _coordinated_send_response(self, message, content: str) -> bool:
+    async def _coordinated_send_response(self, message, content: str, **kwargs) -> bool:
         """Coordinated version of send_response.
 
         For DMs: send immediately (no coordination needed).
@@ -41,13 +41,13 @@ class MessageInterceptor:
         """
         # DMs always go through - only this bot received the DM
         if message.is_dm:
-            result = await self._original_send_response(message, content)
+            result = await self._original_send_response(message, content, **kwargs)
             await self._report_message(message, bot_responded=result)
             return result
 
         # If coordinator is not configured, send immediately
         if not self.coordinator.is_configured:
-            result = await self._original_send_response(message, content)
+            result = await self._original_send_response(message, content, **kwargs)
             await self._report_message(message, bot_responded=result)
             return result
 
@@ -80,7 +80,7 @@ class MessageInterceptor:
         if should_respond is True:
             # Coordinator says we should respond
             logger.info(f"Coordinator assigned response to us for: {content_prefix}")
-            result = await self._original_send_response(message, content)
+            result = await self._original_send_response(message, content, **kwargs)
             await self._report_message(message, bot_responded=result, message_hash=message_hash)
             return result
 
@@ -93,7 +93,7 @@ class MessageInterceptor:
         # should_respond is None - coordinator unreachable, use fallback
         logger.info("Coordinator unreachable, using score-based fallback")
         await self.fallback.wait_before_responding()
-        result = await self._original_send_response(message, content)
+        result = await self._original_send_response(message, content, **kwargs)
         await self._report_message(message, bot_responded=result, message_hash=message_hash)
         return result
 
