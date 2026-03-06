@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
+COPY meshcore-bot/requirements.txt meshcore-bot/requirements.txt
 RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 
 # Stage 2: Runtime
@@ -22,11 +23,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy Python packages from builder
 COPY --from=builder /install /usr/local
 
-# Copy meshcore-bot (embedded, not a submodule)
-COPY meshcore-bot/meshcore_bot.py meshcore-bot/meshcore_bot.py
-COPY meshcore-bot/modules/ meshcore-bot/modules/
-COPY meshcore-bot/translations/ meshcore-bot/translations/
-COPY meshcore-bot/config.ini.example meshcore-bot/config.ini.example
+# Copy meshcore-bot submodule
+COPY meshcore-bot/ meshcore-bot/
 
 # Symlink translations so default config path (translations/) resolves from /app
 RUN ln -sf /app/meshcore-bot/translations /app/translations
