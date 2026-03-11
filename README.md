@@ -1,6 +1,6 @@
 # MeshCore Community Bot
 
-A multi-bot-aware MeshCore mesh radio bot with coordinated response priority. Built on top of [meshcore-bot](https://github.com/cj-vana/meshcore-bot), adding central coordinator integration so multiple bots on the same mesh don't all respond to the same message.
+A multi-bot-aware MeshCore mesh radio bot with coordinated response priority. Built on top of [meshcore-bot](https://github.com/agessaman/meshcore-bot), adding central coordinator integration so multiple bots on the same mesh don't all respond to the same message.
 
 ## How It Works
 
@@ -18,18 +18,34 @@ Your Radio ──► Community Bot ──► Coordinator API
 
 ## Features
 
-Everything from [meshcore-bot](https://github.com/cj-vana/meshcore-bot), plus:
+Everything from [meshcore-bot](https://github.com/agessaman/meshcore-bot) as an unmodified upgradeable submodule, plus:
 
 - **Multi-Bot Coordination** - Only one bot responds per message, based on per-message delivery score
 - **Path-Based Scoring** - Delivery score reflects infrastructure, hops, path familiarity, and freshness
 - **Automatic Fallback** - Works standalone if coordinator is unreachable
 - **Network Reporting** - Messages/packets are reported for network-wide analytics
-- **New Commands** - `coverage` (show your score) and `botstatus` (coordinator status)
+- **New Commands** - `coverage` (show your score), `botstatus` (coordinator status), and `scoring` (top repeaters for use to this bot)
+- **Web Viewer Community Dashboard** - Real-time visualization of coordination decisions, delivery scores, and repeater significance to this bot
+
+## Delivery Scoring Overview
+
+The bot computes a delivery score for each channel message using:
+
+- Infrastructure fan-in/links/connectedness (mesh_connections)
+- Hop count (message.hops)
+- Exact path familiarity (observed_paths)
+- Path freshness (recency decay)
+  Weights and fallback behavior are configurable in [Scoring] section and env vars.
+  If coordinator is unreachable, bots use delivery-score-based delay and suppress responses below minimum score.
+  See docs/COMMUNITY_DESIGN.md for full details.
 
 ## Requirements
 
 - Docker & Docker Compose
-- `make` — on Debian/Ubuntu: `sudo apt-get install -y make`
+  <<<<<<< HEAD
+- # `make` — on Debian/Ubuntu: `sudo apt-get install -y make`
+- make — on Debian/Ubuntu: sudo apt-get install -y make (or use Docker Compose and git submodule commands directly)
+  > > > > > > > d7e8695 (makefile and requirements install from lessons learned)
 - MeshCore-compatible radio (Heltec V3, RAK Wireless, etc.)
 - USB cable, BLE, or TCP connection to the radio
 
@@ -76,10 +92,10 @@ cp config.ini.example config.ini
 ### 4. Start the bot
 
 ```bash
-make start
+make up
 ```
 
-This starts the bot and immediately tails the logs. Ctrl+C stops the log tail but leaves the bot running.
+This builds and starts the bot, immediately tails the logs. Ctrl+C stops the log tail but leaves the bot running.
 
 > Or use `make up` to start in the background without attaching to logs. `make up` and `make start` both initialise the git submodule automatically.
 
@@ -144,10 +160,17 @@ All commands from meshcore-bot are available, plus:
 | ----------- | ----------------------------------------------------------------- |
 | `coverage`  | Shows your bot's current coverage score (current coordinator api) |
 | `botstatus` | Shows coordinator connection status and network info              |
+| `scoring`   | Shows top repeaters contributing to your delivery score           |
 
 ## Updating
 
-Pull the latest changes and rebuild:
+Update to the latest version and redeploy:
+
+```bash
+make redeploy
+```
+
+or
 
 ```bash
 make pull
@@ -155,7 +178,13 @@ make build
 make up
 ```
 
-To upgrade the pinned `meshcore-bot` submodule version, do so directly with git:
+### Submodule Version Management
+
+The `meshcore-bot` submodule is pinned to a tested version and updated deliberately by the maintainers. This ensures compatibility and reliable community coordination. All official upgrades are packaged and released by maintainers.
+
+> **Warning:** Manually changing the submodule version may break community coordination and is not recommended. Only do this if you understand the risks and accept that your bot may not interoperate correctly with others.
+
+To upgrade the pinned `meshcore-bot` submodule version (latest):
 
 ```bash
 git submodule update --remote --merge
@@ -165,11 +194,7 @@ make build
 make up
 ```
 
-### Emergency submodule override (for users)
-
-The `meshcore-bot` submodule is pinned to a tested version and updated deliberately by the maintainers. In most cases you should not need to change it.
-
-However, if a breaking change in `meshcore-bot` upstream is blocking your deployment before an official update is released, you can temporarily pin to a specific commit yourself:
+If you need to temporarily pin to a specific commit (bug resolution):
 
 ```bash
 cd meshcore-bot
@@ -180,7 +205,7 @@ make build
 make up
 ```
 
-> **Note:** This is a local override only — it does not affect other users and will be overwritten the next time you run `make pull` + `make build` from a fresh clone. If you find a fix is needed upstream, please open an issue so the maintainers can update the pinned version for everyone.
+> **Note:** This is a local override only — it does not affect other users and will be overwritten the next time you run `make redeploy` from a fresh clone. If you find a fix is needed upstream, please open an issue so the maintainers can update the pinned version for everyone.
 
 ## Pre-Built Docker Images
 
@@ -211,7 +236,7 @@ Then:
 ```bash
 cp .env.example .env        # Edit with your settings
 cp config.ini.example config.ini  # Edit with your preferences
-docker compose up -d
+make up
 ```
 
 ### Using Docker Run
@@ -252,6 +277,7 @@ Images are published at: `ghcr.io/cj-vana/meshcore-community-bot`
 ```bash
 git clone https://github.com/cj-vana/meshcore-community-bot.git
 cd meshcore-community-bot
+make submodule
 pip install -r requirements.txt
 python3 community_bot.py
 ```
@@ -261,6 +287,7 @@ python3 community_bot.py
 **Bot can't connect to radio:**
 
 - Check `MESHCORE_SERIAL_PORT` matches your device (`ls /dev/ttyUSB*`)
+- Use `ls /dev/by-id/` as an alternative stable device path
 - Make sure Docker has device access (check `docker-compose.yml` devices section)
 
 **Coordinator registration failed:**
