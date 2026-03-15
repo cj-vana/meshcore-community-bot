@@ -6,7 +6,7 @@ MeshCore Community Bot - Extended MeshCore mesh radio bot with multi-bot coordin
 
 ## Architecture
 
-- **Base bot:** meshcore-bot (embedded copy at `meshcore-bot/`) - can be modified directly
+- **Base bot:** meshcore-bot (git submodule at `meshcore-bot/`) - update via git, not direct edits
 - **Extension:** `community/` package adds coordinator client, message interceptor, packet reporter
 - **Entry point:** `community_bot.py` → `community/community_core.py:CommunityBot` (extends `MeshCoreBot`)
 - **Scheduler:** Runs as an asyncio task in the main event loop (not a separate thread)
@@ -15,6 +15,7 @@ MeshCore Community Bot - Extended MeshCore mesh radio bot with multi-bot coordin
 ## Key Integration Point
 
 **`CommandManager.send_response()`** at `meshcore-bot/modules/command_manager.py:552` is patched by `MessageInterceptor`. This single method captures ALL bot responses. The interceptor:
+
 1. Lets DMs through immediately (no coordination needed)
 2. Checks with coordinator for channel messages, passing signal data (SNR, RSSI, hops, path)
 3. Coordinator uses 300ms bidding window + hybrid path quality scoring to pick best bot
@@ -36,7 +37,7 @@ community/
 └── commands/
     ├── coverage_command.py        # "coverage" - show bot's score
     └── botstatus_command.py       # "botstatus" - coordinator status
-meshcore-bot/                      # Embedded copy (modifiable)
+meshcore-bot/                      # Git submodule (do not edit directly)
 ├── modules/
 │   ├── core.py                   # MeshCoreBot - main bot class
 │   ├── command_manager.py        # Command routing, send_response()
@@ -80,6 +81,7 @@ class MyCommand(BaseCommand):
 ## Configuration
 
 Config via environment variables (`.env`) mapped to `config.ini` by `docker/entrypoint.sh`:
+
 - `COORDINATOR_URL` - Central coordinator API URL
 - `COORDINATOR_REGISTRATION_KEY` - Registration key (required, from network admin)
 - `COORDINATOR_TIMEOUT_MS` - Coordination timeout (default 500ms for bidding window)
@@ -95,6 +97,8 @@ Config via environment variables (`.env`) mapped to `config.ini` by `docker/entr
 ```bash
 # Clone
 git clone <repo-url>
+cd meshcore-community-bot
+git submodule update --init --recursive  # Pull meshcore-bot submodule
 
 # Local dev
 pip install -r requirements.txt
