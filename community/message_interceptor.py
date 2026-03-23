@@ -49,13 +49,17 @@ class MessageInterceptor:
     
     async def _wrapped_process_message(self, message, *args, **kwargs):
         token = current_message_var.set(message)
+        coord_token = coordinated_var.set(False)
         try:
             return await self._original_process_message(message, *args, **kwargs)
         finally:
+            coordinated_var.reset(coord_token)
             current_message_var.reset(token)
     
     async def _coordinated_send_channel_message(self, channel, content, command_id=None, skip_user_rate_limit=False, rate_limit_key=None):
         previously_coordinated = coordinated_var.get()
+        message = None
+        message_hash = ""
         if not previously_coordinated: # Keyword Messages that call send_channel_message directly
             try:
                 message = current_message_var.get()
@@ -66,10 +70,10 @@ class MessageInterceptor:
                 logger.warning('[COORDINATOR] send_channel_message no context, sending without coordination')
 
         result = await self._original_send_channel_message(channel, content, command_id, skip_user_rate_limit, rate_limit_key)
-        
+
         if not previously_coordinated: # Keyword Message not yet reported
-            await self._report_message(message=message if 'message' in locals() else None, bot_responded=result, message_hash=message_hash if 'message_hash' in locals() else "")
-        
+            await self._report_message(message=message, bot_responded=result, message_hash=message_hash)
+
         return result
     
     async def _coordinated_send_response(self, message, content: str, **kwargs) -> bool:
@@ -118,9 +122,11 @@ class MessageInterceptor:
 
         logger.debug("[COORDINATOR] Message is a channel message, checking with coordinator before responding")
 
-        # Compute delivery score and path metrics
+        # Compute delivery score and path metrics (DB queries are sync, run in thread)
         db_manager = getattr(self.bot, 'db_manager', None)
-        hop_score, infrastructure, path_bonus, path_freshness = self.coordinator_scoring.get_path_metrics(message, db_manager)
+        hop_score, infrastructure, path_bonus, path_freshness = await asyncio.to_thread(
+            self.coordinator_scoring.get_path_metrics, message, db_manager
+        )
         delivery_score = self.coordinator_scoring.compute_delivery_score(infrastructure, hop_score, path_bonus, path_freshness)
 
         # Extract content prefix safely
@@ -245,6 +251,8 @@ class MessageInterceptor:
             logger.debug(f"Failed to report message: {e}")
 
     def restore(self):
-        """Restore the original send_response method."""
+        """Restore the original patched methods."""
+        self.bot.message_handler.process_message = self._original_process_message
+        self.bot.command_manager.send_channel_message = self._original_send_channel_message
         self.bot.command_manager.send_response = self._original_send_response
         logger.info("Message interceptor removed")
