@@ -385,15 +385,15 @@ def _community_metrics_impl(viewer):
           rows = cur.fetchall()
 
           # rows: list of dicts with 'node' as key
-          nodes = sorted(rows, key=lambda r: len(r['node']))
+          nodes = sorted(rows, key=lambda r: len(r['node']), reverse=True)
           deduped = set()
           deduped_rows = []
           for r in nodes:
               node = r['node']
-              # Only add if no existing node is a prefix of this node
-              if not any(node.startswith(existing) and len(node) > len(existing) for existing in deduped):
-                  # Remove any shorter prefixes now covered by this node
-                  deduped = {existing for existing in deduped if not existing.startswith(node)}
+              # Only add if no existing longer/more-specific node already covers this prefix
+              if not any(existing.startswith(node) and len(existing) > len(node) for existing in deduped):
+                  # Remove any shorter prefixes covered by this more-specific node
+                  deduped = {existing for existing in deduped if not node.startswith(existing)}
                   deduped.add(node)
                   deduped_rows.append(r)
           # deduped_rows is your deduplicated list
