@@ -407,7 +407,9 @@ def _community_metrics_impl(viewer):
             out_hops = r["out_hops"] if "out_hops" in r.keys() else None
             node_fanins.append(fan_in)
             node_hops.append(out_hops)
-          max_hops = max([h for h in node_hops if h is not None], default=0)
+          non_null_hops = [h for h in node_hops if h is not None]
+          has_hop_data = len(non_null_hops) > 0
+          max_hops = max(non_null_hops, default=0)
           # Calculate 90th percentile normalization factor (as in coordinator_scoring.py)
           percentile = 0.9
           sorted_fanins = sorted(node_fanins)
@@ -425,7 +427,7 @@ def _community_metrics_impl(viewer):
             infra = min(1.0, math.log1p(fan_in) / math.log1p(norm_factor))
 
             out_hops = r["out_hops"] if "out_hops" in r.keys() else None
-            max_hop_score = (1.0 / (1 + max_hops)) if max_hops > 0 else 0.1
+            max_hop_score = (1.0 / (1 + max_hops)) if has_hop_data else 0.1
             hop_score = (1.0 / (1 + out_hops)) if out_hops is not None else max_hop_score
 
             path_bonus = 0.0

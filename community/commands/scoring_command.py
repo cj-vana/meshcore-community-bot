@@ -74,7 +74,9 @@ class ScoringCommand(BaseCommand):
                 node_fanins.append(fan_in)
                 out_hops = row.get("out_hops")
                 node_hops.append(out_hops)
-            max_hops = max([h for h in node_hops if h is not None], default=0)
+            non_null_hops = [h for h in node_hops if h is not None]
+            has_hop_data = len(non_null_hops) > 0
+            max_hops = max(non_null_hops, default=0)
             # Calculate 90th percentile normalization factor (as in coordinator_scoring.py)
             percentile = 0.9
             sorted_fanins = sorted(node_fanins)
@@ -95,7 +97,7 @@ class ScoringCommand(BaseCommand):
                 # Calculate scoring components
                 infra = min(1.0, math.log1p(fan_in) / math.log1p(norm_factor))
 
-                max_hop_score = (1.0 / (1 + max_hops)) if max_hops > 0 else 0.1
+                max_hop_score = (1.0 / (1 + max_hops)) if has_hop_data else 0.1
                 hop_score = (1.0 / (1 + hops)) if hops is not None else max_hop_score
                 # path_bonus = 0.0
                 # freshness = math.exp(-age_hours / 24.0)
