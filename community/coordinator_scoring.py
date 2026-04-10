@@ -11,8 +11,28 @@ class CoordinatorScoring:
 
     def __init__(self, scoring_config: ScoringConfig):
         self.config = scoring_config
+    
+    @staticmethod
+    def try_parse_int(value) -> Optional[int]:
+        '''
+        Attempt to parse a value as int. Return None if parsing fails.
+        '''
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
-    def compute_delivery_score(self, infrastructure, hop_score, path_bonus, path_freshness):
+    @staticmethod
+    def try_parse_float(value) -> Optional[float]:
+        '''
+        Attempt to parse a value as float. Return None if parsing fails.
+        '''
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def compute_delivery_score(self, infrastructure, hop_score, path_bonus, path_freshness) -> float:
         """Compute delivery score using weighted formula from config."""
         return (
             infrastructure * self.config.infrastructure_weight
@@ -21,7 +41,7 @@ class CoordinatorScoring:
             + path_freshness * self.config.freshness_weight
         )
 
-    def get_path_metrics(self, message, db_manager):
+    def get_path_metrics(self, message, db_manager) -> tuple[float, float, float, float]:
         """Return (hop_score, infrastructure, path_bonus, path_freshness) for a message.
         
         For Reference from `meshcore-bot/modules/message_handler.py`
@@ -41,7 +61,7 @@ class CoordinatorScoring:
         
         """
         # Hop score
-        hops = getattr(message, 'hops', None)
+        hops = self.try_parse_int(getattr(message, 'hops', None))
         hop_score = self.compute_hop_score(hops)
 
         # Path nodes, will be csv string or 'Direct', parse csv to list
@@ -67,21 +87,21 @@ class CoordinatorScoring:
 
         return hop_score, infrastructure, path_bonus, freshness
 
-    def compute_hop_score(self, hops):
+    def compute_hop_score(self, hops) -> float:
         '''Reward proximity. Less hops, higher delivery potential.'''
-        if hops is None:
+        if hops is None or not isinstance(hops, int):
             return 0.5
         return 1 / (1 + hops)
 
-    def compute_infrastructure_score(self, path_prefixes, db_manager, message=None):
+    def compute_infrastructure_score(self, path_prefixes, db_manager, message=None) -> float:
         '''Reward incoming paths on well connected infrastructure as a higher confidence 
         parallel of returning a message.
         '''
         
-        hops = getattr(message, 'hops', None)
+        hops = self.try_parse_int(getattr(message, 'hops', None))
         
-        snr = getattr(message, 'snr', None)
-        rssi = getattr(message, 'rssi', None)
+        snr = self.try_parse_float(getattr(message, 'snr', None))
+        rssi = self.try_parse_float(getattr(message, 'rssi', None))
         # Normalize SNR (assume -15 to +15 dB typical range)
         snr_score = 0.5
         if snr is not None:
@@ -176,7 +196,7 @@ class CoordinatorScoring:
 
         return infra_score
 
-    def compute_path_bonus(self, sender_id, path_csv, db_manager):
+    def compute_path_bonus(self, sender_id, path_csv, db_manager) -> float:
         '''Reward if this sender+path seen before in message_stats. 
         A lower confidence parallel of connectivity.
         '''
@@ -195,7 +215,7 @@ class CoordinatorScoring:
             return 1.0  # History more than this message
         return 0.0
 
-    def compute_freshness(self, sender_pubkey, sender_id, db_manager):
+    def compute_freshness(self, sender_pubkey, sender_id, db_manager) -> float:
         '''Reward if this sender seen recently and frequently in message_stats.
         A lower confidence parallel of connectivity. Biased by active users so keep weight low.
         Freshness => 'Sender Recency' in this approach. Considered path based as alternative.
@@ -204,16 +224,16 @@ class CoordinatorScoring:
         max_messages_considered = 5
 
         if not sender_pubkey:
-            return 0
+            return 0.0
         from datetime import datetime, timedelta
         now = datetime.now()
         
-        def recency_calc(now, timestamp:float):
+        def recency_calc(now, timestamp:float) -> float:
             #timestamp is an int seconds
             try:
                 timestamp_dt = datetime.fromtimestamp(timestamp)
             except Exception:
-                return 0
+                return 0.0
             age_hours = (now - timestamp_dt).total_seconds() / 3600.0
             return math.exp(-age_hours / 24.0)
 
@@ -248,7 +268,7 @@ class CoordinatorScoring:
                 # Cap at 1.0, recent rewarded, multiple rewarded but with diminishing returns
                 # Compatible with fallback 
                 return min(fresh_sum, 1.0)
-            return 0
+            return 0.0
         except Exception:
             # Fallback: use complete_contact_tracking, likely an advert time 
             logger.debug(f"Freshness fallback triggered for sender_pubkey {sender_pubkey}")
@@ -260,4 +280,4 @@ class CoordinatorScoring:
                 dt = datetime.strptime(last_heard, "%Y-%m-%d %H:%M:%S")
                 last_heard_seconds = dt.timestamp() #to match message_stats
                 return recency_calc(now, last_heard_seconds)
-        return 0
+        return 0.0
