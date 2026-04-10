@@ -89,7 +89,7 @@ class CoordinatorScoring:
 
     def compute_hop_score(self, hops) -> float:
         '''Reward proximity. Less hops, higher delivery potential.'''
-        if hops is None or not isinstance(hops, int):
+        if hops is None or not isinstance(hops, int) or hops < 0:
             return 0.5
         return 1 / (1 + hops)
 
