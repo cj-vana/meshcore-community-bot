@@ -160,20 +160,20 @@ async function refresh() {
       `;
       
       // Show top 3 users with best delivery rate
-      if (dm.top_users && dm.top_users.length > 0) {
+      const topUsers = (dm.top_users || []).filter(u => u.rate >= 70);
+      if (topUsers.length > 0) {
         dmHtml += '<div style=\"margin-top:8px;font-size:12px;color:var(--muted)\"><b>Top delivery:</b></div>';
-        dm.top_users.forEach(u => {
-          if (u.rate < 70) return; // Only highlight users with delivery rate above 70%
+        topUsers.forEach(u => {
           const statusColor = '#2d8a4e'; // Green
           dmHtml += `<div style=\"font-size:11px\"><span style=\"color:${statusColor};font-weight:bold\">${u.rate}%</span> ${u.user} (${u.delivered}/${u.sent})</div>`;
         });
       }
       
       // Show bottom 3 users with worst delivery rate
-      if (dm.bottom_users && dm.bottom_users.length > 0) {
+      const bottomUsers = (dm.bottom_users || []).filter(u => u.rate < 70);
+      if (bottomUsers.length > 0) {
         dmHtml += '<div style=\"margin-top:6px;font-size:12px;color:var(--muted)\"><b>Needs attention:</b></div>';
-        dm.bottom_users.forEach(u => {
-          if (u.rate >= 70) return; // Only highlight users with delivery rate below 70%
+        bottomUsers.forEach(u => {
           const statusColor = u.rate >= 30 ? '#b07d1a' : '#990000'; // Yellow for 30-69%, Red for below 30%
           dmHtml += `<div style=\"font-size:11px\"><span style=\"color:${statusColor};font-weight:bold\">${u.rate}%</span> ${u.user} (${u.delivered}/${u.sent})</div>`;
         });
