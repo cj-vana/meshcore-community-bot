@@ -8,7 +8,6 @@ Inherits from MeshCoreBot and adds:
 """
 
 import asyncio
-import configparser
 import importlib
 import importlib.util
 import inspect
@@ -26,9 +25,9 @@ from community.web_viewer_patch import patch_web_viewer_integration
 from modules.commands.base_command import BaseCommand
 from modules.core import MeshCoreBot
 
-from .config import CoordinatorConfig, ScoringConfig
+from .config import CoordinatorConfig
 from .coordinator_client import CoordinatorClient
-from .coverage_fallback import CoverageFallback
+from .response_timing import ResponseTiming
 from .message_interceptor import MessageInterceptor
 from .packet_reporter import PacketReporter
 
@@ -62,28 +61,14 @@ class CommunityBot(MeshCoreBot):
 
         # Load coordinator config
         self.coordinator_config = CoordinatorConfig.from_env_and_config(self.config)
-        self.logger.info('Coordinator config loaded')
-        self.logger.debug(
+        logger.info('Coordinator config loaded')
+        logger.debug(
             f"Coordinator config: url={self.coordinator_config.url}, "
             f"heartbeat_interval={self.coordinator_config.heartbeat_interval}s, "
             f"coordination_timeout={self.coordinator_config.coordination_timeout_ms}ms, "
             f"batch_interval={self.coordinator_config.batch_interval_seconds}s, "
             f"batch_max_size={self.coordinator_config.batch_max_size}, "
             f"mesh_region={self.coordinator_config.mesh_region}"
-        )
-
-        # Load scoring config
-        scoring_config_path = Path(__file__).parent / "scoring_config.ini"
-        scoring_config_object = configparser.ConfigParser()
-        scoring_config_object.read(scoring_config_path)
-        self.scoring_config = ScoringConfig.from_env_and_config(scoring_config_object)
-        self.logger.info('Scoring config loaded')
-        self.logger.debug(
-            "Scoring weights loaded: infra=%.2f hops=%.2f path_bonus=%.2f freshness=%.2f",
-            self.scoring_config.infrastructure_weight,
-            self.scoring_config.hop_weight,
-            self.scoring_config.path_bonus_weight,
-            self.scoring_config.freshness_weight,
         )
 
         # ------------------------------------------------------------------------
@@ -98,8 +83,8 @@ class CommunityBot(MeshCoreBot):
             registration_key=self.coordinator_config.registration_key,
         )
 
-        # Initialize fallback
-        self.coverage_fallback = CoverageFallback()
+        # Initialize response timing
+        self.response_timing = ResponseTiming()
 
         # Initialize packet reporter
         self.packet_reporter = PacketReporter(
@@ -112,7 +97,7 @@ class CommunityBot(MeshCoreBot):
         self.message_interceptor = MessageInterceptor(
             bot=self,
             coordinator=self.coordinator,
-            fallback=self.coverage_fallback,
+            timing=self.response_timing,
             reporter=self.packet_reporter,
         )
 
@@ -123,7 +108,7 @@ class CommunityBot(MeshCoreBot):
         self._coordinator_tasks: list[asyncio.Task] = []
         self._registered_with_real_key = False
 
-        self.logger.info("Community bot initialized with coordinator support")
+        logger.info("Community bot initialized with coordinator support")
     
     def _setup_community_logging(self):
         """Mirror all MeshCoreBot handlers onto the CommunityBot logger.
@@ -202,14 +187,14 @@ class CommunityBot(MeshCoreBot):
                                 self.plugin_loader.plugin_metadata[cmd_name] = metadata
                                 for kw in metadata.get('keywords', []):
                                     self.plugin_loader.keyword_mappings[kw.lower()] = cmd_name
-                            self.logger.info(f"Loaded community command: {cmd_name}")
+                            logger.info(f"Loaded community command: {cmd_name}")
                         break
             except Exception as e:
-                self.logger.warning(f"Failed to load community command {py_file.name}: {e}")
+                logger.warning(f"Failed to load community command {py_file.name}: {e}")
 
     async def start(self):
         """Start the bot with coordinator integration."""
-        self.logger.info("Starting Community Bot...")
+        logger.info("Starting Community Bot...")
 
         # Start coordinator background tasks (heartbeat will handle registration)
         self._start_coordinator_tasks()
@@ -285,7 +270,7 @@ class CommunityBot(MeshCoreBot):
 
         if success:
             self._registered_with_real_key = True
-            self.logger.info(
+            logger.info(
                 f"Registered with coordinator as {bot_name} "
                 f"(bot_id={self.coordinator.bot_id}, pubkey={public_key[:12]}...)"
             )
@@ -304,7 +289,7 @@ class CommunityBot(MeshCoreBot):
         task = asyncio.create_task(self.packet_reporter.run())
         self._coordinator_tasks.append(task)
 
-        self.logger.info("Coordinator background tasks started")
+        logger.info("Coordinator background tasks started")
 
     async def _heartbeat_loop(self):
         """Send periodic heartbeats to the coordinator.
@@ -319,7 +304,7 @@ class CommunityBot(MeshCoreBot):
                     if self.connected and self.meshcore:
                         success = await self._register_with_coordinator()
                         if not success:
-                            self.logger.debug("Waiting for radio to provide public key...")
+                            logger.debug("Waiting for radio to provide public key...")
                     # Don't send heartbeats until registered
                     await asyncio.sleep(5)
                     continue
@@ -338,13 +323,9 @@ class CommunityBot(MeshCoreBot):
                     contact_count=contact_count,
                     channel_count=channel_count,
                 )
-
-                if success:
-                    # Update fallback score
-                    self.coverage_fallback.update_score(self.coordinator.current_score)
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                self.logger.debug(f"Heartbeat error: {e}")
+                logger.debug(f"Heartbeat error: {e}")
 
             await asyncio.sleep(self.coordinator.heartbeat_interval)
